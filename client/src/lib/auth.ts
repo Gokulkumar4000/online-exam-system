@@ -17,7 +17,7 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
     
     console.log('Firebase Auth user created successfully:', firebaseUser.uid);
     
-    // Create user profile in Firestore
+    // Create user profile in Firestore with scores included
     const user: User = {
       id: firebaseUser.uid,
       name: userData.name,
@@ -27,22 +27,11 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
       createdAt: new Date(),
     };
 
-    // Save user profile to Firestore
+    // Save user profile with scores to Firestore users collection
     console.log('Saving user profile to Firestore...');
     await setDoc(doc(db, 'users', firebaseUser.uid), {
       ...user,
       createdAt: user.createdAt.toISOString(),
-    });
-    console.log('User profile saved successfully');
-
-    // Initialize user scores
-    console.log('Initializing user scores...');
-    await setDoc(doc(db, 'userScores', firebaseUser.uid), {
-      id: firebaseUser.uid,
-      userId: firebaseUser.uid,
-      name: user.name,
-      email: user.email,
-      contactNo: user.contactNo,
       scores: {
         webDevelopment: null,
         ai: null,
@@ -50,7 +39,7 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
       },
       lastUpdated: new Date().toISOString(),
     });
-    console.log('User scores initialized successfully');
+    console.log('User profile and scores saved successfully');
 
     return user;
   } catch (error: any) {

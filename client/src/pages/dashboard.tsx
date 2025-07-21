@@ -49,22 +49,32 @@ export default function Dashboard() {
     if (!user || !db) return;
 
     try {
-      // Load user scores
-      const userScoreDoc = await getDoc(doc(db, 'userScores', user.id));
-      if (userScoreDoc.exists()) {
-        const scoreData = userScoreDoc.data();
-        setUserScore({
-          ...scoreData,
-          lastUpdated: new Date(scoreData.lastUpdated),
-        } as UserScore);
+      console.log('Loading dashboard data for user:', user.id);
+      
+      // Load user data including scores from users collection
+      const userDoc = await getDoc(doc(db, 'users', user.id));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        console.log('User data loaded:', userData);
+        
+        // Create UserScore object from user data
+        if (userData.scores) {
+          setUserScore({
+            id: user.id,
+            userId: user.id,
+            name: user.name,
+            email: user.email,
+            contactNo: user.contactNo,
+            scores: userData.scores,
+            lastUpdated: userData.lastUpdated ? new Date(userData.lastUpdated) : new Date(),
+          } as UserScore);
+        }
       }
 
       // Load exam history
       const historyQuery = query(
         collection(db, 'examAttempts'),
-        where('userId', '==', user.id),
-        orderBy('completedAt', 'desc'),
-        limit(5)
+        where('userId', '==', user.id)
       );
       
       const historySnapshot = await getDocs(historyQuery);
@@ -73,6 +83,7 @@ export default function Dashboard() {
         completedAt: new Date(doc.data().completedAt),
       })) as ExamAttempt[];
       
+      console.log('Exam history loaded:', history.length, 'attempts');
       setExamHistory(history);
     } catch (error) {
       console.error('Error loading dashboard data:', error);

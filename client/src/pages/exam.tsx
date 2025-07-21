@@ -64,15 +64,19 @@ export default function Exam() {
     if (!subjectId || !user || !db) return;
 
     try {
+      console.log('Loading exam for subject:', subjectId);
+      
       // Try to load from Firestore first
       const subjectDoc = await getDoc(doc(db, 'subjects', subjectId));
       
       if (subjectDoc.exists()) {
         const subjectData = subjectDoc.data() as Subject;
+        console.log('Loaded subject from Firestore:', subjectData.name, 'Questions:', subjectData.questions?.length);
         setSubject(subjectData);
         setQuestions(subjectData.questions);
         setAnswers(new Array(subjectData.questions.length).fill(null));
       } else {
+        console.log('Subject not found in Firestore, using fallback questions');
         // Fallback to sample data
         const subjectNames: Record<string, string> = {
           'web-development': 'Web Development',
@@ -81,6 +85,8 @@ export default function Exam() {
         };
 
         const examQuestions = sampleQuestions[subjectId] || [];
+        console.log('Using fallback questions for', subjectId, 'Count:', examQuestions.length);
+        
         const mockSubject: Subject = {
           id: subjectId,
           name: subjectNames[subjectId] || 'Unknown Subject',
@@ -95,7 +101,31 @@ export default function Exam() {
       }
     } catch (error) {
       console.error('Error loading exam:', error);
-      setLocation('/dashboard');
+      
+      // On error, still try to use fallback
+      console.log('Using emergency fallback due to error');
+      const subjectNames: Record<string, string> = {
+        'web-development': 'Web Development',
+        'ai': 'Artificial Intelligence',
+        'data-science': 'Data Science',
+      };
+
+      const examQuestions = sampleQuestions[subjectId] || [];
+      if (examQuestions.length > 0) {
+        const mockSubject: Subject = {
+          id: subjectId,
+          name: subjectNames[subjectId] || 'Unknown Subject',
+          duration: 30,
+          totalQuestions: examQuestions.length,
+          questions: examQuestions,
+        };
+
+        setSubject(mockSubject);
+        setQuestions(examQuestions);
+        setAnswers(new Array(examQuestions.length).fill(null));
+      } else {
+        setLocation('/dashboard');
+      }
     } finally {
       setLoading(false);
     }
@@ -179,18 +209,18 @@ export default function Exam() {
       await Promise.race([saveAttemptPromise, timeoutPromise]);
       console.log('Exam attempt saved successfully');
 
-      // Update user scores
-      const userScoreRef = doc(db, 'userScores', user.id);
+      // Update user scores in users collection
+      const userRef = doc(db, 'users', user.id);
       const scoreField = subject.id === 'web-development' ? 'webDevelopment' :
                         subject.id === 'ai' ? 'ai' : 'dataScience';
 
-      const updateScorePromise = updateDoc(userScoreRef, {
+      const updateScorePromise = updateDoc(userRef, {
         [`scores.${scoreField}`]: percentage,
         lastUpdated: new Date().toISOString(),
       });
 
       await Promise.race([updateScorePromise, timeoutPromise]);
-      console.log('User scores updated successfully');
+      console.log('User scores updated successfully in users collection');
 
       setLocation(`/results/${attemptId}`);
     } catch (error) {

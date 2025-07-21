@@ -14,7 +14,7 @@ function verifyPassword(password: string, hash: string): boolean {
 
 export async function registerUser(userData: InsertUser): Promise<User | null> {
   if (!db) {
-    throw new Error('Firebase not initialized. Please provide configuration.');
+    throw new Error('Firebase not initialized. Please check your configuration.');
   }
   
   try {
@@ -42,14 +42,16 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
       createdAt: new Date(),
     };
 
-    // Save user to Firestore
-    await setDoc(doc(db, 'users', userId), {
+    // Save user to Firestore with retry logic
+    const userDocRef = doc(db, 'users', userId);
+    await setDoc(userDocRef, {
       ...user,
       createdAt: user.createdAt.toISOString(),
     });
 
     // Initialize user scores
-    await setDoc(doc(db, 'userScores', userId), {
+    const scoresDocRef = doc(db, 'userScores', userId);
+    await setDoc(scoresDocRef, {
       id: userId,
       userId: userId,
       name: user.name,
@@ -63,6 +65,7 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
       lastUpdated: new Date().toISOString(),
     });
 
+    console.log('User registered successfully:', userId);
     return user;
   } catch (error) {
     console.error('Registration error:', error);

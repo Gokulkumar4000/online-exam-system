@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { User } from '@shared/schema';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, logoutUser } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -16,29 +18,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const currentUser = await getCurrentUser();
-      setUser(currentUser);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      setUser(null);
-    } finally {
+    if (!auth) {
       setLoading(false);
+      return;
     }
-  };
+
+    // Listen to Firebase Auth state changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userProfile = await getCurrentUser();
+          setUser(userProfile);
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const login = (user: User) => {
     setUser(user);
-    localStorage.setItem('userId', user.id);
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('userId');
+  const logout = async () => {
+    try {
+      await logoutUser();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (

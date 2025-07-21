@@ -1,53 +1,45 @@
-import { db } from './firebase';
-import { collection, doc, getDoc, setDoc, query, where, getDocs, Firestore } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, User as FirebaseUser } from 'firebase/auth';
 import type { User, InsertUser } from '@shared/schema';
-import { userSchema } from '@shared/schema';
-
-// Simple password hashing (in production, use bcrypt on backend)
-function hashPassword(password: string): string {
-  return btoa(password + 'salt'); // Base64 encoding for demo
-}
-
-function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash;
-}
 
 export async function registerUser(userData: InsertUser): Promise<User | null> {
-  if (!db) {
+  if (!db || !auth) {
     throw new Error('Firebase not initialized. Please check your configuration.');
   }
   
   try {
-    console.log('Starting user registration for:', userData.email);
-
-    // Generate user ID first
-    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log('Creating Firebase Auth user for:', userData.email);
     
-    // Hash password
-    const hashedPassword = hashPassword(userData.password);
+    // Create user in Firebase Authentication
+    const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
+    const firebaseUser = userCredential.user;
     
+    console.log('Firebase Auth user created successfully:', firebaseUser.uid);
+    
+    // Create user profile in Firestore
     const user: User = {
-      id: userId,
+      id: firebaseUser.uid,
       name: userData.name,
       email: userData.email,
-      password: hashedPassword,
+      password: '', // Don't store password in Firestore since Firebase Auth handles it
       contactNo: userData.contactNo,
       createdAt: new Date(),
     };
 
-    // Save user to Firestore directly without complex checks
-    console.log('Saving user to Firestore...');
-    await setDoc(doc(db, 'users', userId), {
+    // Save user profile to Firestore
+    console.log('Saving user profile to Firestore...');
+    await setDoc(doc(db, 'users', firebaseUser.uid), {
       ...user,
       createdAt: user.createdAt.toISOString(),
     });
-    console.log('User document saved successfully');
+    console.log('User profile saved successfully');
 
     // Initialize user scores
     console.log('Initializing user scores...');
-    await setDoc(doc(db, 'userScores', userId), {
-      id: userId,
-      userId: userId,
+    await setDoc(doc(db, 'userScores', firebaseUser.uid), {
+      id: firebaseUser.uid,
+      userId: firebaseUser.uid,
       name: user.name,
       email: user.email,
       contactNo: user.contactNo,
@@ -61,72 +53,108 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
     console.log('User scores initialized successfully');
 
     return user;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error);
+    
+    // Handle specific Firebase Auth errors
+    if (error.code === 'auth/email-already-in-use') {
+      throw new Error('An account with this email already exists');
+    } else if (error.code === 'auth/weak-password') {
+      throw new Error('Password should be at least 6 characters');
+    } else if (error.code === 'auth/invalid-email') {
+      throw new Error('Invalid email address');
+    }
+    
     throw error;
   }
 }
 
 export async function loginUser(email: string, password: string): Promise<User | null> {
-  if (!db) {
-    throw new Error('Firebase not initialized. Please provide configuration.');
+  if (!db || !auth) {
+    throw new Error('Firebase not initialized. Please check your configuration.');
   }
-  
+
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', email));
-    const querySnapshot = await getDocs(q);
+    console.log('Attempting to sign in user:', email);
     
-    if (querySnapshot.empty) {
-      throw new Error('Invalid email or password');
+    // Sign in with Firebase Authentication
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const firebaseUser = userCredential.user;
+    
+    console.log('Firebase Auth sign in successful:', firebaseUser.uid);
+    
+    // Get user profile from Firestore
+    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+    
+    if (!userDoc.exists()) {
+      throw new Error('User profile not found');
     }
 
-    const userDoc = querySnapshot.docs[0];
     const userData = userDoc.data();
-    
-    if (!verifyPassword(password, userData.password)) {
-      throw new Error('Invalid email or password');
-    }
-
     const user: User = {
-      id: userData.id,
-      name: userData.name,
-      email: userData.email,
-      password: userData.password,
-      contactNo: userData.contactNo,
+      ...userData,
       createdAt: new Date(userData.createdAt),
-    };
+    } as User;
 
+    console.log('User profile loaded successfully');
     return user;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
+    
+    // Handle specific Firebase Auth errors
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      throw new Error('Invalid email or password');
+    } else if (error.code === 'auth/invalid-email') {
+      throw new Error('Invalid email address');
+    } else if (error.code === 'auth/too-many-requests') {
+      throw new Error('Too many failed attempts. Please try again later');
+    }
+    
     throw error;
   }
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const userId = localStorage.getItem('userId');
-  if (!userId || !db) return null;
+  if (!db || !auth) {
+    return null;
+  }
 
   try {
-    const userDoc = await getDoc(doc(db, 'users', userId));
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
+      return null;
+    }
+
+    // Get user profile from Firestore
+    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+    
     if (!userDoc.exists()) {
-      localStorage.removeItem('userId');
       return null;
     }
 
     const userData = userDoc.data();
-    return {
-      id: userData.id,
-      name: userData.name,
-      email: userData.email,
-      password: userData.password,
-      contactNo: userData.contactNo,
+    const user: User = {
+      ...userData,
       createdAt: new Date(userData.createdAt),
-    };
+    } as User;
+
+    return user;
   } catch (error) {
-    console.error('Get current user error:', error);
-    localStorage.removeItem('userId');
+    console.error('Error getting current user:', error);
     return null;
+  }
+}
+
+export async function logoutUser(): Promise<void> {
+  if (!auth) {
+    throw new Error('Firebase not initialized');
+  }
+
+  try {
+    await signOut(auth);
+    console.log('User signed out successfully');
+  } catch (error) {
+    console.error('Logout error:', error);
+    throw error;
   }
 }

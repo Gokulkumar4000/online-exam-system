@@ -8,7 +8,7 @@ import ExamTimer from '@/components/ExamTimer';
 import QuestionCard from '@/components/QuestionCard';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import type { Subject, Question, ExamAttempt } from '@shared/schema';
+import type { Subject, Question, ExamAttempt, QuestionResponse } from '@shared/schema';
 import { X, AlertTriangle, Loader2 } from 'lucide-react';
 
 // Sample questions - in production, these would be in Firestore
@@ -137,38 +137,65 @@ export default function Exam() {
     const percentage = Math.round((correctAnswers / questions.length) * 100);
 
     try {
-      // Create exam attempt record
+      // Create detailed question responses
+      const questionResponses: QuestionResponse[] = questions.map((question, index) => ({
+        questionText: question.questionText,
+        options: question.options,
+        correctAnswer: question.correctAnswer,
+        userAnswer: answers[index],
+        isCorrect: answers[index] === question.correctAnswer,
+      }));
+
+      // Create exam attempt record with detailed data
       const attemptId = `attempt_${user.id}_${subject.id}_${Date.now()}`;
       const examAttempt: ExamAttempt = {
         id: attemptId,
         userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        userContact: user.contactNo,
         subjectId: subject.id,
         subjectName: subject.name,
         answers: answers.map(a => a ?? -1), // Replace null with -1 for unanswered
+        questionResponses,
         score: correctAnswers,
         percentage,
         timeTaken,
         completedAt: new Date(),
       };
 
-      await setDoc(doc(db, 'examAttempts', attemptId), {
+      console.log('Submitting exam attempt:', attemptId);
+      
+      // Save with timeout to prevent hanging
+      const saveAttemptPromise = setDoc(doc(db, 'examAttempts', attemptId), {
         ...examAttempt,
         completedAt: examAttempt.completedAt.toISOString(),
       });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Exam submission timeout')), 10000);
+      });
+
+      await Promise.race([saveAttemptPromise, timeoutPromise]);
+      console.log('Exam attempt saved successfully');
 
       // Update user scores
       const userScoreRef = doc(db, 'userScores', user.id);
       const scoreField = subject.id === 'web-development' ? 'webDevelopment' :
                         subject.id === 'ai' ? 'ai' : 'dataScience';
 
-      await updateDoc(userScoreRef, {
+      const updateScorePromise = updateDoc(userScoreRef, {
         [`scores.${scoreField}`]: percentage,
         lastUpdated: new Date().toISOString(),
       });
 
+      await Promise.race([updateScorePromise, timeoutPromise]);
+      console.log('User scores updated successfully');
+
       setLocation(`/results/${attemptId}`);
     } catch (error) {
       console.error('Error submitting exam:', error);
+      alert('Failed to submit exam. Please try again.');
     }
   };
 

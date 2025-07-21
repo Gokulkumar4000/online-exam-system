@@ -18,16 +18,9 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
   }
   
   try {
-    // Check if user already exists
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', userData.email));
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      throw new Error('User with this email already exists');
-    }
+    console.log('Starting user registration for:', userData.email);
 
-    // Generate user ID
+    // Generate user ID first
     const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Hash password
@@ -42,16 +35,17 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
       createdAt: new Date(),
     };
 
-    // Save user to Firestore with retry logic
-    const userDocRef = doc(db, 'users', userId);
-    await setDoc(userDocRef, {
+    // Save user to Firestore directly without complex checks
+    console.log('Saving user to Firestore...');
+    await setDoc(doc(db, 'users', userId), {
       ...user,
       createdAt: user.createdAt.toISOString(),
     });
+    console.log('User document saved successfully');
 
     // Initialize user scores
-    const scoresDocRef = doc(db, 'userScores', userId);
-    await setDoc(scoresDocRef, {
+    console.log('Initializing user scores...');
+    await setDoc(doc(db, 'userScores', userId), {
       id: userId,
       userId: userId,
       name: user.name,
@@ -64,8 +58,8 @@ export async function registerUser(userData: InsertUser): Promise<User | null> {
       },
       lastUpdated: new Date().toISOString(),
     });
+    console.log('User scores initialized successfully');
 
-    console.log('User registered successfully:', userId);
     return user;
   } catch (error) {
     console.error('Registration error:', error);

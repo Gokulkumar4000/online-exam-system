@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFirestore, enableNetwork, disableNetwork } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -21,6 +21,11 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
+    
+    // Enable offline persistence
+    enableNetwork(db).catch((error) => {
+      console.warn('Firebase network enable failed:', error);
+    });
     
     console.log('Firebase initialized successfully');
   } catch (error) {

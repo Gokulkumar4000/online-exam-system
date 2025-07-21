@@ -52,13 +52,28 @@ export const userScoreSchema = z.object({
 
 export type UserScore = z.infer<typeof userScoreSchema>;
 
+// Question Response Schema
+export const questionResponseSchema = z.object({
+  questionText: z.string(),
+  options: z.array(z.string()),
+  correctAnswer: z.number(),
+  userAnswer: z.number().nullable(),
+  isCorrect: z.boolean(),
+});
+
+export type QuestionResponse = z.infer<typeof questionResponseSchema>;
+
 // Exam Attempt Schema
 export const examAttemptSchema = z.object({
   id: z.string(),
   userId: z.string(),
+  userName: z.string(),
+  userEmail: z.string(),
+  userContact: z.string(),
   subjectId: z.string(),
   subjectName: z.string(),
   answers: z.array(z.number()),
+  questionResponses: z.array(questionResponseSchema),
   score: z.number(),
   percentage: z.number(),
   timeTaken: z.number(), // in seconds

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import type { ExamAttempt, Subject, Question } from '@shared/schema';
+import type { ExamAttempt, Subject, Question, QuestionResponse } from '@shared/schema';
 import { Trophy, Home, RotateCcw, Check, X, Loader2 } from 'lucide-react';
 
 // Sample questions for display - same as in exam.tsx
@@ -42,11 +42,11 @@ export default function Results() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { attemptId } = useParams<{ attemptId: string }>();
+  const [showAllQuestions, setShowAllQuestions] = useState(false);
   
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAllQuestions, setShowAllQuestions] = useState(false);
 
   useEffect(() => {
     if (attemptId && user) {

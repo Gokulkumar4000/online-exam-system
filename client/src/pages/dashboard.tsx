@@ -13,21 +13,21 @@ const defaultSubjects: Subject[] = [
     id: 'web-development',
     name: 'Web Development',
     duration: 30,
-    totalQuestions: 20,
+    totalQuestions: 10,
     questions: [], // Will be loaded from Firestore
   },
   {
     id: 'ai',
     name: 'Artificial Intelligence',
     duration: 40,
-    totalQuestions: 25,
+    totalQuestions: 10,
     questions: [], // Will be loaded from Firestore
   },
   {
     id: 'data-science',
     name: 'Data Science',
     duration: 45,
-    totalQuestions: 30,
+    totalQuestions: 10,
     questions: [], // Will be loaded from Firestore
   },
 ];

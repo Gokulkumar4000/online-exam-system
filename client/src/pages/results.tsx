@@ -73,9 +73,33 @@ export default function Results() {
 
       setAttempt(examAttempt);
 
-      // Load questions (fallback to sample data)
-      const subjectQuestions = sampleQuestions[examAttempt.subjectId] || [];
-      setQuestions(subjectQuestions);
+      // Use the question responses from the exam attempt if available
+      if (examAttempt.questionResponses && examAttempt.questionResponses.length > 0) {
+        const questionsFromAttempt: Question[] = examAttempt.questionResponses.map(qr => ({
+          questionText: qr.questionText,
+          options: qr.options,
+          correctAnswer: qr.correctAnswer,
+        }));
+        setQuestions(questionsFromAttempt);
+      } else {
+        // Load from subject document in Firestore
+        try {
+          const subjectDoc = await getDoc(doc(db, 'subjects', examAttempt.subjectId));
+          if (subjectDoc.exists()) {
+            const subjectData = subjectDoc.data() as Subject;
+            setQuestions(subjectData.questions);
+          } else {
+            // Fallback to sample data only as last resort
+            const subjectQuestions = sampleQuestions[examAttempt.subjectId] || [];
+            setQuestions(subjectQuestions);
+          }
+        } catch (error) {
+          console.error('Error loading subject questions:', error);
+          // Fallback to sample data
+          const subjectQuestions = sampleQuestions[examAttempt.subjectId] || [];
+          setQuestions(subjectQuestions);
+        }
+      }
     } catch (error) {
       console.error('Error loading results:', error);
       setLocation('/dashboard');
@@ -127,7 +151,9 @@ export default function Results() {
   }
 
   const status = getStatusBadge(attempt.percentage);
-  const incorrectAnswers = questions.length - attempt.score;
+  // Calculate incorrect answers based on total questions in the attempt
+  const totalQuestions = attempt.questionResponses ? attempt.questionResponses.length : attempt.answers.length;
+  const incorrectAnswers = totalQuestions - attempt.score;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -168,7 +194,7 @@ export default function Results() {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">{attempt.percentage}%</div>
-                    <div className="text-xs text-gray-600">{attempt.score}/{questions.length}</div>
+                    <div className="text-xs text-gray-600">{attempt.score}/{totalQuestions}</div>
                   </div>
                 </div>
               </div>
@@ -223,7 +249,7 @@ export default function Results() {
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Question Review</h2>
             
             <div className="space-y-4">
-              {questions.slice(0, showAllQuestions ? questions.length : 2).map((question, index) => {
+              {questions.map((question, index) => {
                 const userAnswer = attempt.answers[index];
                 const isCorrect = userAnswer === question.correctAnswer;
                 const wasAnswered = userAnswer !== -1;
@@ -271,17 +297,6 @@ export default function Results() {
                   </div>
                 );
               })}
-
-              {questions.length > 2 && (
-                <div className="text-center py-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowAllQuestions(!showAllQuestions)}
-                  >
-                    {showAllQuestions ? 'Show Less' : 'Show All Questions'}
-                  </Button>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>

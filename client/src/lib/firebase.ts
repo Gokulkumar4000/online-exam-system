@@ -1,38 +1,46 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore, enableNetwork, disableNetwork } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getFirestore, enableNetwork, type Firestore } from 'firebase/firestore';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics';
 
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyBK8zkDOT2G27AhyhJ9--418GSgfBtDUZo",
+  authDomain: "gncipl-week-2-a8c06.firebaseapp.com",
+  projectId: "gncipl-week-2-a8c06",
+  storageBucket: "gncipl-week-2-a8c06.firebasestorage.app",
+  messagingSenderId: "1082103193809",
+  appId: "1:1082103193809:web:b31b250d0b463e0911e5f0",
+  measurementId: "G-ERXSNLNLFS"
 };
 
-// Only initialize Firebase if we have the required config
-let app;
-let db;
-let auth;
+// Initialize Firebase
+let app: FirebaseApp;
+let db: Firestore;
+let auth: Auth;
+let analytics: Analytics | undefined;
 
-if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-  try {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
-    
-    // Enable offline persistence
-    enableNetwork(db).catch((error) => {
-      console.warn('Firebase network enable failed:', error);
-    });
-    
-    console.log('Firebase initialized successfully');
-  } catch (error) {
-    console.error('Firebase initialization error:', error);
-  }
-} else {
-  console.warn('Firebase configuration missing. Please provide environment variables.');
+try {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  
+  // Initialize Analytics only if supported (not in server environments)
+  isSupported().then((supported) => {
+    if (supported && app) {
+      analytics = getAnalytics(app);
+    }
+  });
+  
+  // Enable offline persistence
+  enableNetwork(db).catch((error) => {
+    console.warn('Firebase network enable failed:', error);
+  });
+  
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Firebase initialization error:', error);
 }
 
-export { db, auth };
+export { db, auth, analytics };

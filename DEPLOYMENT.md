@@ -31,10 +31,14 @@ The application has been built successfully:
    - Choose your Git provider and select your repository
 
 3. **Build Settings:**
-   - Build command: `vite build`
+   - Build command: `vite build` 
    - Publish directory: `dist/public`
    - Node version: 18
    - These settings are automatically configured via `netlify.toml`
+
+   **Important:** If the build fails, manually set these in Netlify dashboard:
+   - Build command: `vite build`
+   - Publish directory: `dist/public`
 
 4. **Deploy:**
    - Click "Deploy site"
